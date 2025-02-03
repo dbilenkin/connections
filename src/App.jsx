@@ -37,13 +37,52 @@ function App() {
   const [solvedRowsCount, setSolvedRowsCount] = useState(0);
   const [mistakesRemaining, setMistakesRemaining] = useState(4);
   const [shake, setShake] = useState(false);
+  const [puzzle, setPuzzle] = useState([]);
 
-  // On mount, initialize grid and lookup from testPuzzle.
+  // Example: Use this useEffect to fetch the puzzle from your Google Sheet.
+  useEffect(() => {
+    const fetchPuzzle = async () => {
+      // Replace these values with your actual spreadsheet ID, range, and API key.
+      const spreadsheetId = '1FQQ7Fq33o0Id1mVxqYPLWDeESw9PHtny_TUmVhAsVuE';
+      const range = 'Sheet1'; // Change if your sheet or named range is different.
+      const apiKey = 'AIzaSyB63KBJD9T40Cx-bH0WONPsRJ5_1IzVaJs';
+      const url = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${range}?key=${apiKey}`;
+
+      try {
+        const response = await fetch(url);
+        const data = await response.json();
+        const rows = data.values;
+        if (rows && rows.length > 1) {
+          // Assume the first row contains headers.
+          // e.g. ["Difficulty", "Category", "Clue 1", "Clue 2", "Clue 3", "Clue 4"]
+          const puzzleData = rows.slice(1).map((row) => {
+            return {
+              [row[1]]: [row[2], row[3], row[4], row[5]]
+            };
+          });
+          setPuzzle(puzzleData);
+        }
+      } catch (error) {
+        console.error("Error fetching puzzle data:", error);
+      }
+    };
+
+    fetchPuzzle();
+  }, []);
+
+  // For demonstration purposes, you can log the puzzle once it's loaded.
+  useEffect(() => {
+    if (puzzle.length) {
+      console.log("Puzzle data:", puzzle);
+    }
+  }, [puzzle]);
+
+  // On mount, initialize grid and lookup from puzzle.
   useEffect(() => {
     const words = [];
     const lookup = {};
 
-    testPuzzle.forEach((categoryObj, difficulty) => {
+    puzzle.forEach((categoryObj, difficulty) => {
       const category = Object.keys(categoryObj)[0]; // e.g. "letters"
       categoryObj[category].forEach((word) => {
         words.push(word);
@@ -53,7 +92,7 @@ function App() {
 
     setGrid(shuffleArray(words));
     setWordLookup(lookup);
-  }, []);
+  }, [puzzle]);
 
   // Allow selection only on unsolved cells.
   const handleSelect = (word) => {
@@ -86,14 +125,14 @@ function App() {
   // Called when mistakes run out.
   const solvePuzzle = () => {
     // Build the solved grid generically:
-    const solvedGrid = testPuzzle.reduce((acc, obj) => {
+    const solvedGrid = puzzle.reduce((acc, obj) => {
       // Get the first (and only) array in each object
       const row = Object.values(obj)[0];
       return acc.concat(row);
     }, []);
     setGrid(solvedGrid);
     // Assuming each object represents a row, set solved rows count to the number of objects
-    setSolvedRowsCount(testPuzzle.length);
+    setSolvedRowsCount(puzzle.length);
   };
 
 
