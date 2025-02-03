@@ -41,7 +41,7 @@ function App() {
         const response = await fetch(url);
         const data = await response.json();
         if (data.sheets) {
-          const names = data.sheets.map(sheet => sheet.properties.title);
+          const names = data.sheets.slice(1).map(sheet => sheet.properties.title);
           setPuzzleList(names);
           // Read the query parameter directly
           const params = new URLSearchParams(window.location.search);
