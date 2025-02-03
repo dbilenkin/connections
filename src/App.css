@@ -3,6 +3,7 @@
 body {
   margin: 0;
 }
+
 .app-container {
   display: flex;
   flex-direction: column;
@@ -12,6 +13,29 @@ body {
   padding: 6px;
   text-align: center;
   font-family: Arial, Helvetica, sans-serif;
+}
+
+.header {
+  margin: 10px;
+  text-align: right;
+  width: 100%;
+  font-size: 18px;
+  font-weight: 100;
+  margin-right: 10px;
+  font-family: sans-serif;
+}
+
+.header select {
+  font-size: 18px;
+  font-weight: 100;
+  font-family: sans-serif;
+}
+
+.hr {
+  width: 100%;
+  max-width: 390px;
+  border-bottom: 1px solid black;
+  opacity: .5;
 }
 
 .title {
