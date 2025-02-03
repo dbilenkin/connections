@@ -3,10 +3,10 @@ import "./App.css";
 
 function App() {
   const testPuzzle = [
-    { letters: ["A", "B", "C", "D"] },
-    { numbers: ["1", "2", "3", "4"] },
-    { actors: ["Tom Cruise", "Scarlett Johansson", "Robert De Niro", "Kate Winslet"] },
-    { stars: ["Sirius", "Deneb", "Betelgeuse", "Rigel"] }
+    { "Types of Snakes": ["Cobra", "Python", "Viper", "Mamba"] },
+    { "Precious Stones": ["Ruby", "Diamond", "Emerald", "Sapphire"] },
+    { "Slang for Coffee": ["Java", "Brew", "Joe", "Mud"] },
+    { "70s American Muscle Cars": ["Charger", "Mustang", "Camaro", "GTO"] }
   ];
 
   const difficultyColors = ["#f0d66a", "#9bbd57", "#aabee7", "#b37cc0"];
