@@ -12,7 +12,18 @@ function App() {
   const difficultyColors = ["#f0d66a", "#9bbd57", "#aabee7", "#b37cc0"];
 
   // Helper: shuffle an array
-  const shuffleArray = (array) => [...array].sort(() => Math.random() - 0.5);
+  function shuffleArray(array) {
+    // Make a shallow copy of the array to avoid mutating the original
+    const newArray = array.slice();
+    for (let i = newArray.length - 1; i > 0; i--) {
+      // Pick a random index from 0 to i (inclusive)
+      const j = Math.floor(Math.random() * (i + 1));
+      // Swap newArray[i] with newArray[j]
+      [newArray[i], newArray[j]] = [newArray[j], newArray[i]];
+    }
+    return newArray;
+  }
+
 
   // State:
   // grid: the current order of the 16 words
@@ -25,6 +36,7 @@ function App() {
   const [selectedItems, setSelectedItems] = useState([]);
   const [solvedRowsCount, setSolvedRowsCount] = useState(0);
   const [mistakesRemaining, setMistakesRemaining] = useState(4);
+  const [shake, setShake] = useState(false);
 
   // On mount, initialize grid and lookup from testPuzzle.
   useEffect(() => {
@@ -61,11 +73,9 @@ function App() {
     const startShuffle = solvedRowsCount * 4;
     const unshuffledWords = grid.slice(0, startShuffle);
     const shuffledWords = grid.slice(startShuffle);
-    shuffledWords.sort(() => Math.random() - 0.5);
-    const shuffledArray = [...unshuffledWords, ...shuffledWords]
+    const shuffledArray = [...unshuffledWords, ...shuffleArray(shuffledWords)]
 
     setGrid(shuffledArray);
-
   };
 
   // Deselect All clears the current selection.
@@ -75,16 +85,17 @@ function App() {
 
   // Called when mistakes run out.
   const solvePuzzle = () => {
-    // Build the solved grid in the correct order:
-    const solvedGrid = [
-      ...testPuzzle[0].letters,
-      ...testPuzzle[1].numbers,
-      ...testPuzzle[2].actors,
-      ...testPuzzle[3].stars,
-    ];
+    // Build the solved grid generically:
+    const solvedGrid = testPuzzle.reduce((acc, obj) => {
+      // Get the first (and only) array in each object
+      const row = Object.values(obj)[0];
+      return acc.concat(row);
+    }, []);
     setGrid(solvedGrid);
-    setSolvedRowsCount(4);
+    // Assuming each object represents a row, set solved rows count to the number of objects
+    setSolvedRowsCount(testPuzzle.length);
   };
+
 
   // Handle Submit:
   // If exactly 4 words are selected:
@@ -124,17 +135,21 @@ function App() {
       if (solvedRowsCount + 1 === 4) {
         setTimeout(() => alert("You solved the puzzle!"), 100);
       }
+      setSelectedItems([]);
     } else {
-      // Wrong submission: decrement mistakesRemaining.
-      const newMistakes = mistakesRemaining - 1;
-      setMistakesRemaining(newMistakes);
-      if (newMistakes === 0) {
-        alert("Sorry you weren't able to solve the puzzle");
-        solvePuzzle();
-      }
+      // Wrong guess: trigger shake animation on selected cells.
+      setShake(true);
+      // After the shake duration, clear selection and update mistakes.
+      setTimeout(() => {
+        setShake(false);
+        const newMistakes = mistakesRemaining - 1;
+        setMistakesRemaining(newMistakes);
+        if (newMistakes === 0) {
+          alert("Sorry you weren't able to solve the puzzle");
+          solvePuzzle();
+        }
+      }, 500); // Duration matches the CSS animation duration.
     }
-    // Clear selection in either case.
-    setSelectedItems([]);
   };
 
   // Dynamically compute a font size based on the longest word in the string.
@@ -166,10 +181,12 @@ function App() {
       } else {
         for (let col = 0; col < 4; col++) {
           const word = grid[rowStart + col];
+          const isSelected = selectedItems.includes(word);
+          const cellClass = `grid-item ${isSelected ? "selected" : ""} ${isSelected && shake ? "shake" : ""}`;
           elements.push(
             <div
               key={rowStart + col}
-              className={`grid-item ${selectedItems.includes(word) ? "selected" : ""}`}
+              className={cellClass}
               style={{ fontSize: getFontSize(word) }}
               onClick={() => handleSelect(word)}
             >
