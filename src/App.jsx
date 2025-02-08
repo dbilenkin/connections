@@ -18,10 +18,11 @@ function App() {
   const spreadsheetId = '1FQQ7Fq33o0Id1mVxqYPLWDeESw9PHtny_TUmVhAsVuE';
   const apiKey = 'AIzaSyB63KBJD9T40Cx-bH0WONPsRJ5_1IzVaJs';
 
-  // Puzzle-related state
-  const [puzzleList, setPuzzleList] = useState([]); // list of sheet names (each a puzzle)
-  const [currentSheet, setCurrentSheet] = useState(""); // currently selected sheet name
-  const [puzzle, setPuzzle] = useState([]); // parsed puzzle data from the selected sheet
+  // Puzzler & Puzzle Data
+  const [puzzleList, setPuzzleList] = useState([]);         // List of sheet names (each a puzzler)
+  const [currentSheet, setCurrentSheet] = useState("");       // Currently selected sheet name (puzzler)
+  const [puzzles, setPuzzles] = useState([]);                 // Array of puzzles from the selected sheet
+  const [currentPuzzleIndex, setCurrentPuzzleIndex] = useState(0); // Index of the selected puzzle
 
   // Game state
   const [grid, setGrid] = useState([]);
@@ -29,10 +30,11 @@ function App() {
   const [selectedItems, setSelectedItems] = useState([]);
   const [solvedRowsCount, setSolvedRowsCount] = useState(0);
   const [mistakesRemaining, setMistakesRemaining] = useState(4);
+  const [guessedCombinations, setGuessedCombinations] = useState([]);
   const [shake, setShake] = useState(false);
 
   /* -------------------------------------
-     1. Fetch Sheet Names for the Dropdown
+     0. Fetch Puzzlers for the Dropdown
   -------------------------------------- */
   useEffect(() => {
     const fetchSheetNames = async () => {
@@ -41,14 +43,13 @@ function App() {
         const response = await fetch(url);
         const data = await response.json();
         if (data.sheets) {
+          // Optionally skip the first sheet if it contains metadata:
           const names = data.sheets.slice(1).map(sheet => sheet.properties.title);
           setPuzzleList(names);
-          // Read the query parameter directly
+          // Read the query parameter and default to the first sheet if needed.
           const params = new URLSearchParams(window.location.search);
-          const puzzleParam = params.get("puzzle");
-          // If a valid query parameter exists and it matches one of the sheet names, use it;
-          // otherwise, default to the first sheet.
-          const sheetToSet = (puzzleParam && names.includes(puzzleParam)) ? puzzleParam : names[0];
+          const puzzlerParam = params.get("puzzler");
+          const sheetToSet = (puzzlerParam && names.includes(puzzlerParam)) ? puzzlerParam : names[0];
           setCurrentSheet(sheetToSet);
         }
       } catch (error) {
@@ -58,9 +59,8 @@ function App() {
     fetchSheetNames();
   }, [spreadsheetId, apiKey]);
 
-
   /* -------------------------------------
-     2. Fetch Puzzle Data from the Selected Sheet
+    1. Fetch Puzzles for the Dropdown
   -------------------------------------- */
   useEffect(() => {
     if (!currentSheet) return;
@@ -72,16 +72,32 @@ function App() {
         const data = await response.json();
         const rows = data.values;
         if (rows && rows.length > 1) {
-          // Assume the first row contains headers:
-          // e.g., ["Difficulty", "Category", "Clue 1", "Clue 2", "Clue 3", "Clue 4"]
-          const puzzleData = rows.slice(1).map((row, i) => {
-            return {
-              difficulty: i,
-              category: row[0],
-              clues: [row[1], row[2], row[3], row[4]]
-            };
-          });
-          setPuzzle(puzzleData);
+          // Assume the first row is headers:
+          // e.g.: ["Name (Optional)", "Category", "Clue 1", "Clue 2", "Clue 3", "Clue 4"]
+          const dataRows = rows.slice(1);
+          const puzzlesFromSheet = [];
+          // Every 4 rows is one puzzle.
+          for (let i = 0; i < dataRows.length; i += 4) {
+            const group = dataRows.slice(i, i + 4);
+            if (group.length < 4) break; // Skip incomplete groups.
+            // Optional puzzle name from the first cell of the first row.
+            const puzzleName = group[0][0] || "";
+            const rowsData = group.map(row => ({
+              category: row[1], // Category is in the 2nd column.
+              clues: [row[2], row[3], row[4], row[5]] // Clues are in columns 3-6.
+            }));
+            puzzlesFromSheet.push({
+              name: puzzleName,
+              rows: rowsData
+            });
+          }
+          setPuzzles(puzzlesFromSheet);
+          // Reset the current puzzle selection.
+          // Read the query parameter and default to the first sheet if needed.
+          const params = new URLSearchParams(window.location.search);
+          const puzzleParam = params.get("puzzle");
+          const puzzleIndex = puzzleParam !== null ? puzzleParam : 0;
+          setCurrentPuzzleIndex(puzzleIndex);
         }
       } catch (error) {
         console.error("Error fetching puzzle data:", error);
@@ -90,28 +106,31 @@ function App() {
     fetchPuzzle();
   }, [currentSheet, spreadsheetId, apiKey]);
 
+
   /* -------------------------------------
      3. Initialize the Game Grid & Word Lookup when Puzzle Data Changes
   -------------------------------------- */
   useEffect(() => {
-    const words = [];
-    const lookup = {};
-    // We convert our puzzle data (an array of objects, one per row) into the format expected by our game.
-    // For each puzzle row, we create an object with the key as the category and value as the clues array.
-    const formattedPuzzle = puzzle.map(item => ({ [item.category]: item.clues }));
-    formattedPuzzle.forEach((categoryObj, difficulty) => {
-      const category = Object.keys(categoryObj)[0];
-      categoryObj[category].forEach(word => {
-        words.push(word);
-        lookup[word] = { category, difficulty };
+    if (puzzles && puzzles.length > 0) {
+      // Use the currently selected puzzle.
+      const activePuzzle = puzzles[currentPuzzleIndex];
+      const words = [];
+      const lookup = {};
+      activePuzzle.rows.forEach((row, difficulty) => {
+        row.clues.forEach(word => {
+          words.push(word);
+          lookup[word] = { category: row.category, difficulty };
+        });
       });
-    });
-    setGrid(shuffleArray(words));
-    setWordLookup(lookup);
-    setSolvedRowsCount(0);
-    setMistakesRemaining(4);
-    setSelectedItems([]);
-  }, [puzzle]);
+      setGrid(shuffleArray(words));
+      setWordLookup(lookup);
+      // Reset game state.
+      setSolvedRowsCount(0);
+      setMistakesRemaining(4);
+      setSelectedItems([]);
+    }
+  }, [puzzles, currentPuzzleIndex]);
+
 
   /* -------------------------------------
      4. Game Functions
@@ -143,20 +162,61 @@ function App() {
 
   // Generic solvePuzzle: builds solved grid in order from the puzzle data.
   const solvePuzzle = () => {
-    const solvedGrid = puzzle.reduce((acc, obj) => {
+    const puzzle = puzzles[currentPuzzleIndex];
+    const solvedGrid = puzzle.rows.reduce((acc, obj) => {
       const row = obj.clues; // clues array
       return acc.concat(row);
     }, []);
     setGrid(solvedGrid);
-    setSolvedRowsCount(puzzle.length);
+    setSolvedRowsCount(puzzle.rows.length);
   };
+
+  const handleMistake = () => {
+    // Count the categories in the selected items.
+    const categoryCounts = selectedItems.reduce((acc, word) => {
+      const category = wordLookup[word].category;
+      acc[category] = (acc[category] || 0) + 1;
+      return acc;
+    }, {});
+    setShake(true);
+    setTimeout(() => {
+      setShake(false);
+      const newMistakes = mistakesRemaining - 1;
+      setMistakesRemaining(newMistakes);
+      if (newMistakes === 0) {
+        alert("Sorry you weren't able to solve the puzzle");
+        solvePuzzle();
+      } else if (Object.values(categoryCounts).some(count => count === 3)) {
+        alert("One away");
+      }
+    }, 500)
+  }
 
   // Handle Submit: if 4 selected words all belong to the same category, swap them into the next unsolved row.
   const handleSubmit = () => {
     if (selectedItems.length !== 4) return;
+
+    // Determine the grid indices for the selected items.
+    const guessIndices = selectedItems.map(word => grid.indexOf(word));
+    // Sort the indices to ensure the guess order is consistent regardless of selection order.
+    guessIndices.sort((a, b) => a - b);
+    // Create a unique key (string) for this guess.
+    const guessKey = guessIndices.join(',');
+
+    // Check if this guess has already been attempted.
+    if (guessedCombinations.includes(guessKey)) {
+      alert("already guessed");
+      return;
+    }
+
+    // Record this new guess.
+    setGuessedCombinations([...guessedCombinations, guessKey]);
+
     const firstCategory = wordLookup[selectedItems[0]].category;
     const allMatch = selectedItems.every(word => wordLookup[word].category === firstCategory);
+
     if (allMatch) {
+      // Correct selection: update the grid and solved rows.
       const newGrid = [...grid];
       const rowStart = solvedRowsCount * 4;
       selectedItems.forEach(selectedWord => {
@@ -177,18 +237,10 @@ function App() {
       }
       setSelectedItems([]);
     } else {
-      setShake(true);
-      setTimeout(() => {
-        setShake(false);
-        const newMistakes = mistakesRemaining - 1;
-        setMistakesRemaining(newMistakes);
-        if (newMistakes === 0) {
-          alert("Sorry you weren't able to solve the puzzle");
-          solvePuzzle();
-        }
-      }, 500);
+      handleMistake();
     }
   };
+
 
   // Calculate font size based on longest word.
   const getFontSize = (word) => {
@@ -198,6 +250,33 @@ function App() {
     );
     return `${Math.min(1.1, 6 / longestWord.length)}rem`;
   };
+
+  // Helper function to update URL query parameters.
+  const updateQueryParams = (newParams) => {
+    const params = new URLSearchParams(window.location.search);
+    Object.entries(newParams).forEach(([key, value]) => {
+      params.set(key, value);
+    });
+    const newUrl = `${window.location.pathname}?${params.toString()}`;
+    window.history.pushState({}, '', newUrl);
+  };
+
+  // Handle puzzler (sheet) change.
+  const handlePuzzlerChange = (e) => {
+    const puzzler = e.target.value;
+    setCurrentSheet(puzzler);
+    // Reset the puzzle index to 0 when the puzzler changes.
+    setCurrentPuzzleIndex(0);
+    updateQueryParams({ puzzler, puzzle: 0 });
+  };
+
+  // Handle puzzle selection change.
+  const handlePuzzleSelectChange = (e) => {
+    const puzzleIndex = parseInt(e.target.value, 10);
+    setCurrentPuzzleIndex(puzzleIndex);
+    updateQueryParams({ puzzle: puzzleIndex });
+  };
+
 
   // Render the grid row-by-row.
   const renderGrid = () => {
@@ -248,28 +327,36 @@ function App() {
     );
   };
 
-  // Handle puzzle change from dropdown.
-  const handlePuzzleChange = (e) => {
-    const sheetName = e.target.value;
-    setCurrentSheet(sheetName);
-
-    // Update the URL query parameter "puzzle" to the selected sheet.
-    const params = new URLSearchParams(window.location.search);
-    params.set("puzzle", sheetName);
-    const newUrl = `${window.location.pathname}?${params.toString()}`;
-    window.history.pushState({}, '', newUrl);
-  };
+  const renderHeader = () => {
+    return (
+      <div className="header">
+        <span>
+          <label htmlFor="puzzler-select">Puzzler: </label>
+          <select id="puzzler-select" value={currentSheet} onChange={handlePuzzlerChange}>
+            {puzzleList.map((sheet, index) => (
+              <option key={index} value={sheet}>
+                {sheet}
+              </option>
+            ))}
+          </select>
+        </span>
+        <span>
+          <label htmlFor="puzzle-select">Puzzle: </label>
+          <select id="puzzle-select" value={currentPuzzleIndex} onChange={handlePuzzleSelectChange}>
+            {puzzles.map((puzzle, index) => (
+              <option key={index} value={index}>
+                {puzzle.name || `Puzzle ${index + 1}`}
+              </option>
+            ))}
+          </select>
+        </span>
+      </div>
+    )
+  }
 
   return (
     <div className="app-container">
-      <div className="header">
-        <label htmlFor="puzzle-select">Choose Puzzle: </label>
-        <select id="puzzle-select" value={currentSheet} onChange={handlePuzzleChange}>
-          {puzzleList.map((sheet, index) => (
-            <option key={index} value={sheet}>{sheet}</option>
-          ))}
-        </select>
-      </div>
+      {renderHeader()}
       <div className="hr"></div>
       <span className="title">Create four groups of four!</span>
       <div className="grid-container">{renderGrid()}</div>

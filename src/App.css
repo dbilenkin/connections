@@ -16,6 +16,10 @@ body {
 }
 
 .header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  max-width: 390px;
   margin: 10px;
   text-align: right;
   width: 100%;
@@ -82,12 +86,29 @@ body {
 
 /* Shake animation */
 @keyframes shake {
-  0% { transform: translateX(0); }
-  20% { transform: translateX(-5px); }
-  40% { transform: translateX(5px); }
-  60% { transform: translateX(-5px); }
-  80% { transform: translateX(5px); }
-  100% { transform: translateX(0); }
+  0% {
+    transform: translateX(0);
+  }
+
+  20% {
+    transform: translateX(-5px);
+  }
+
+  40% {
+    transform: translateX(5px);
+  }
+
+  60% {
+    transform: translateX(-5px);
+  }
+
+  80% {
+    transform: translateX(5px);
+  }
+
+  100% {
+    transform: translateX(0);
+  }
 }
 
 .shake {
@@ -104,7 +125,8 @@ body {
   background-color: yellow;
   color: black;
   border-radius: 8px;
-  aspect-ratio: 4.26; /* I know I know */
+  aspect-ratio: 4.26;
+  /* I know I know */
 }
 
 /* Content inside merged cell */
